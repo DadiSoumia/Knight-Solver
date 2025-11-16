@@ -172,7 +172,6 @@ def menu_page():
 
         pygame.display.flip()
 
-# ---- Grid Page ----
 def grid_page():
     grid_n = 8
     cell_size = 50
@@ -181,18 +180,17 @@ def grid_page():
     board_x = (WIDTH - board_width) // 2
     board_y = (HEIGHT - board_height) // 2 + 20
 
-    knight_pos = (2, 3)
-    sample_positions = [
-        (2, 3, "1"), (0, 1, "2"), (1, 3, "3"), (3, 2, "4"),
-        (1, 4, "5"), (0, 5, "6"), (2, 1, "7"), (4, 0, "8"),
-        (5, 1, "9"), (6, 0, "10")
-    ]
-    step_count = len(sample_positions)
+    # --- Boutons ---
+    back_btn = Button(16, 18, 110, 44, "BACK", base_color=(120,180,255), accent=(160,200,255), font=SMALL_BUTTON_FONT)
+    pause_btn = Button(16, 74, 110, 44, "PAUSE", base_color=(165,100,255), accent=(200,140,255), font=SMALL_BUTTON_FONT)
+    reset_btn = Button(16, 130, 110, 44, "RESET", base_color=(255,120,180), accent=(255,150,210), font=SMALL_BUTTON_FONT)
 
-    back_btn = Button(16, 18, 110, 44, "BACK", base_color=(120, 180, 255), accent=(160, 200, 255), font=SMALL_BUTTON_FONT)
-    pause_btn = Button(16, 74, 110, 44, "PAUSE", base_color=(165, 100, 255), accent=(200, 140, 255), font=SMALL_BUTTON_FONT)
-    reset_btn = Button(16, 130, 110, 44, "RESET", base_color=(255, 120, 180), accent=(255, 150, 210), font=SMALL_BUTTON_FONT)
-
+    # --- AG variables ---
+    from Population import Population
+    population_size = 30
+    population = Population(population_size)
+    best_knight = None
+    step_index = 0
     paused = False
     pause_start = None
     paused_total = 0.0
@@ -208,32 +206,36 @@ def grid_page():
                 if back_btn.is_clicked(event.pos):
                     return "menu"
                 if pause_btn.is_clicked(event.pos):
-                    if not paused:
-                        paused = True
-                        pause_start = time.time()
-                        pause_btn.text = "RESUME"
-                    else:
-                        paused = False
-                        if pause_start is not None:
-                            paused_total += time.time() - pause_start
-                        pause_start = None
-                        pause_btn.text = "PAUSE"
+                    paused = not paused
+                    pause_start = time.time() if paused else None
+                    pause_btn.text = "RESUME" if paused else "PAUSE"
                 if reset_btn.is_clicked(event.pos):
                     start_time = time.time()
                     paused_total = 0.0
                     paused = False
                     pause_start = None
-                    step_count = len(sample_positions)
+                    population = Population(population_size)
+                    best_knight = None
+                    step_index = 0
 
-        now = time.time()
-        if paused and pause_start is not None:
+        if paused:
+            if pause_start is not None:
+                paused_total += time.time() - pause_start
+                pause_start = time.time()
             elapsed = pause_start - start_time - paused_total
         else:
+            now = time.time()
             elapsed = now - start_time - paused_total
 
-        vertical_gradient(SCREEN, (0, 0, WIDTH, HEIGHT), BG_TOP, BG_BOTTOM)
+            # --- Algorithme Génétique ---
+            if best_knight is None or best_knight.fitness < 64:
+                population.check_population()
+                best_knight, best_fitness = population.evaluate()
+                population.create_new_generation()
+                step_index = 0  # reset du chemin
 
-        # Draw grid squares
+        # --- Dessiner la grille ---
+        vertical_gradient(SCREEN, (0,0,WIDTH,HEIGHT), BG_TOP, BG_BOTTOM)
         for r in range(grid_n):
             for c in range(grid_n):
                 rect = pygame.Rect(board_x + c*cell_size, board_y + r*cell_size, cell_size, cell_size)
@@ -242,62 +244,43 @@ def grid_page():
                 draw_rounded_rect(SCREEN, rect, base_color, radius=6)
                 pygame.draw.rect(SCREEN, PRETTY_PINK, rect, width=2, border_radius=6)
 
-        # Draw numbered squares
-        for (r, c, label) in sample_positions:
-            rect = pygame.Rect(board_x + c*cell_size, board_y + r*cell_size, cell_size, cell_size)
-            is_light = (r + c) % 2 == 0
+        # --- Dessiner le chemin du meilleur chevalier ---
+        if best_knight:
+            sample_positions = [(pos[0], pos[1], str(i+1)) for i,pos in enumerate(best_knight.path[:step_index])]
+            if step_index < len(best_knight.path):
+                step_index += 1  # avancer d'une étape à chaque frame
 
-            if (r, c) == knight_pos:
+            for (r,c,label) in sample_positions:
+                rect = pygame.Rect(board_x + c*cell_size, board_y + r*cell_size, cell_size, cell_size)
                 overlay_color = KNIGHT_COLOR
-                num_color = KNIGHT_NUM_COLOR
                 overlay_surf = pygame.Surface((cell_size, cell_size), pygame.SRCALPHA)
                 overlay_surf.fill((*overlay_color, 230))
                 SCREEN.blit(overlay_surf, rect.topleft)
-                pygame.draw.rect(SCREEN, PRETTY_PINK, rect, width=3, border_radius=6)
-            else:
-                overlay_color = GRID_LIGHT_NUM if is_light else DARK_PURPLE_OVERLAY
-                num_color = NUM_COLOR
-                overlay_surf = pygame.Surface((cell_size, cell_size), pygame.SRCALPHA)
-                overlay_surf.fill((*overlay_color, 200))
-                SCREEN.blit(overlay_surf, rect.topleft)
-                pygame.draw.rect(SCREEN, PRETTY_PINK, rect, width=2, border_radius=6)
+                txt = GRID_NUM_FONT.render(label, True, KNIGHT_NUM_COLOR)
+                SCREEN.blit(txt, (rect.x + (cell_size - txt.get_width())//2, rect.y + (cell_size - txt.get_height())//2))
 
-            txt = GRID_NUM_FONT.render(label, True, num_color)
-            SCREEN.blit(txt, (rect.x + (cell_size - txt.get_width())//2, rect.y + (cell_size - txt.get_height())//2))
-
-        # Draw axes numbers
-        for i in range(grid_n):
-            idx_surf = SMALL_FONT.render(str(i+1), True, AXIS_NUM_COLOR)
-            SCREEN.blit(idx_surf, (board_x - 30, board_y + i*cell_size + (cell_size - idx_surf.get_height())//2))
-            SCREEN.blit(idx_surf, (board_x + board_width + 12, board_y + i*cell_size + (cell_size - idx_surf.get_height())//2))
-            SCREEN.blit(idx_surf, (board_x + i*cell_size + (cell_size - idx_surf.get_width())//2, board_y - 28))
-            SCREEN.blit(idx_surf, (board_x + i*cell_size + (cell_size - idx_surf.get_width())//2, board_y + board_height + 8))
-
-        # Draw buttons
+        # --- Dessiner boutons et infos ---
         back_btn.draw(SCREEN)
         pause_btn.draw(SCREEN)
         reset_btn.draw(SCREEN)
 
-        # Draw timer and steps with white background and pink border
+        # Timer et steps
         info_w, info_h = 200, 60
-        info_x = WIDTH - info_w - 20
-        info_y = 20
+        info_x, info_y = WIDTH - info_w - 20, 20
         pygame.draw.rect(SCREEN, WHITE, (info_x, info_y, info_w, info_h), border_radius=12)
         pygame.draw.rect(SCREEN, PRETTY_PINK, (info_x, info_y, info_w, info_h), width=2, border_radius=12)
-        timer_label = INFO_FONT.render("TIMER", True, AXIS_NUM_COLOR)
-        timer_val = INFO_FONT.render(f"{int(elapsed)} s", True, AXIS_NUM_COLOR)
-        SCREEN.blit(timer_label, (info_x + 12, info_y + 8))
-        SCREEN.blit(timer_val, (info_x + 12, info_y + 32))
+        SCREEN.blit(INFO_FONT.render("TIMER", True, AXIS_NUM_COLOR), (info_x + 12, info_y + 8))
+        SCREEN.blit(INFO_FONT.render(f"{int(elapsed)} s", True, AXIS_NUM_COLOR), (info_x + 12, info_y + 32))
 
         steps_y = info_y + info_h + 12
         pygame.draw.rect(SCREEN, WHITE, (info_x, steps_y, info_w, info_h), border_radius=12)
         pygame.draw.rect(SCREEN, PRETTY_PINK, (info_x, steps_y, info_w, info_h), width=2, border_radius=12)
-        steps_label = INFO_FONT.render("STEPS", True, AXIS_NUM_COLOR)
-        steps_val = INFO_FONT.render(str(step_count), True, AXIS_NUM_COLOR)
-        SCREEN.blit(steps_label, (info_x + 12, steps_y + 8))
-        SCREEN.blit(steps_val, (info_x + 12, steps_y + 32))
+        SCREEN.blit(INFO_FONT.render("STEPS", True, AXIS_NUM_COLOR), (info_x + 12, steps_y + 8))
+        steps_val = len(best_knight.path[:step_index]) if best_knight else 0
+        SCREEN.blit(INFO_FONT.render(str(steps_val), True, AXIS_NUM_COLOR), (info_x + 12, steps_y + 32))
 
         pygame.display.flip()
+
 
 def main():
     page = "menu"
