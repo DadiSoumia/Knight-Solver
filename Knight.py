@@ -4,7 +4,7 @@ from Chromosome import Chromosome
 class Knight:
     def __init__(self, chromosome=None):
         # Position initiale
-        self.position = (0, 0)
+        self.position = (0,0)
         self.path = [self.position]  # liste des positions visitées
         self.fitness = 0  # nombre de cases visitées sans répétition
 
