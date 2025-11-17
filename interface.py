@@ -340,12 +340,6 @@ def grid_page():
         info_x = WIDTH - info_w - 20
         info_y = 20
 
-        pygame.draw.rect(SCREEN, WHITE, (info_x, info_y, info_w, info_h), border_radius=12)
-        pygame.draw.rect(SCREEN, PRETTY_PINK, (info_x, info_y, info_w, info_h), width=2, border_radius=12)
-        timer_label = INFO_FONT.render("TIMER", True, AXIS_NUM_COLOR)
-        timer_val = INFO_FONT.render(f"{int(elapsed)} s", True, AXIS_NUM_COLOR)
-        SCREEN.blit(timer_label, (info_x + 12, info_y + 8))
-        SCREEN.blit(timer_val, (info_x + 12, info_y + 32))
 
         steps_y = info_y + info_h + 12
         pygame.draw.rect(SCREEN, WHITE, (info_x, steps_y, info_w, info_h), border_radius=12)
